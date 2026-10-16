@@ -8,7 +8,7 @@ for pkg in ["transkun", "customtkinter"]:
     binaries += b
     hidden += h
 
-binaries += [("bin/ffmpeg.exe", "bin")]
+binaries += [(f"bin/{exe}", "bin") for exe in ("ffmpeg.exe", "ffprobe.exe")]
 if os.path.exists("assets/logo.png"):
     datas += [("assets/logo.png", "assets")]
 if os.path.exists("assets/tetomidi.ico"):
