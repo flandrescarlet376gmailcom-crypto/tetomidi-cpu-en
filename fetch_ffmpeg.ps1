@@ -1,22 +1,9 @@
-import os
-from PyInstaller.utils.hooks import collect_all
-
-datas, binaries, hidden = [], [], []
-for pkg in ["transkun", "customtkinter"]:
-    d, b, h = collect_all(pkg)
-    datas += d
-    binaries += b
-    hidden += h
-
-binaries += [(f"bin/{exe}", "bin") for exe in ("ffmpeg.exe", "ffprobe.exe")]
-if os.path.exists("assets/logo.png"):
-    datas += [("assets/logo.png", "assets")]
-if os.path.exists("assets/tetomidi.ico"):
-    datas += [("assets/tetomidi.ico", "assets")]
-icon = "assets/tetomidi.ico" if os.path.exists("assets/tetomidi.ico") else None
-
-a = Analysis(["main.py"], binaries=binaries, datas=datas, hiddenimports=hidden)
-pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True,
-          name="tetomidi", icon=icon, console=False)
-coll = COLLECT(exe, a.binaries, a.datas, name="tetomidi")
+$ProgressPreference = "SilentlyContinue"
+New-Item -ItemType Directory -Force bin | Out-Null
+Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ff.zip
+Expand-Archive ff.zip ff -Force
+pydub needs ffprobe as well as ffmpeg
+foreach ($exe in @("ffmpeg.exe", "ffprobe.exe")) {
+    $src = (Get-ChildItem ff -Recurse -Filter $exe | Select-Object -First 1).FullName
+    Copy-Item $src (Join-Path bin $exe) -Force
+}
