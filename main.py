@@ -1,6 +1,8 @@
 import os
 import sys
 import queue
+import webbrowser
+import subprocess
 import traceback
 import multiprocessing as mp
 from tkinter import filedialog
@@ -26,6 +28,42 @@ BG = "#000000"
 TEXT = "#ffffff"
 MUTED = "#8a8a8a"
 W = 404  # content width
+DISCORD_URL = "https://discord.gg/dbxUt4kBZ"
+
+GUIDE_TEXT = (
+    "Cách sử dụng tetomidi\n\n"
+    "1. Bấm \"Select audio / video file\" và chọn file mp3, mp4, m4a hoặc wav.\n\n"
+    "2. Bấm \"Transcribe\" để bắt đầu chuyển sang MIDI.\n\n"
+    "3. Chờ đến khi có thông báo hoàn tất. Muốn dừng giữa chừng, bấm nút ✕.\n\n"
+    "4. Bấm \"Open midi folder\" để mở thư mục chứa file .mid.\n\n"
+    "File MIDI được lưu trong thư mục midi nằm cạnh app. "
+    "File dài hoặc máy yếu sẽ mất nhiều thời gian hơn."
+)
+
+
+def _folder_icon(size=26):
+    """Draw a simple yellow folder icon (no external asset needed)."""
+    from PIL import ImageDraw
+    S = size * 4
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    gold = "#E8C15A"
+    d.rounded_rectangle((S * 0.08, S * 0.18, S * 0.42, S * 0.36), radius=S * 0.05, fill=gold)
+    d.rounded_rectangle((S * 0.08, S * 0.30, S * 0.92, S * 0.82), radius=S * 0.08, fill=gold)
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def _discord_icon(size=26):
+    """Draw a simple Discord-style controller icon (no external asset needed)."""
+    from PIL import ImageDraw
+    S = size * 4
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((S * 0.08, S * 0.18, S * 0.92, S * 0.82),
+                        radius=S * 0.22, fill="#5865F2")
+    d.ellipse((S * 0.30, S * 0.38, S * 0.46, S * 0.58), fill="#ffffff")
+    d.ellipse((S * 0.54, S * 0.38, S * 0.70, S * 0.58), fill="#ffffff")
+    return img.resize((size, size), Image.LANCZOS)
 
 
 def output_dir():
@@ -45,13 +83,34 @@ def output_dir():
     return d
 
 
+def _tune_cpu():
+    """Use the machine's cores efficiently; works on weak/integrated CPUs too."""
+    cores = os.cpu_count() or 2
+    # Leave one core free so the UI and OS stay responsive on small machines
+    threads = max(1, cores - 1) if cores > 2 else cores
+    os.environ.setdefault("OMP_NUM_THREADS", str(threads))
+    os.environ.setdefault("MKL_NUM_THREADS", str(threads))
+    try:
+        import torch
+        torch.set_num_threads(threads)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            pass  # already set by another call; harmless
+    except ImportError:
+        pass
+
+
 def _worker(src, dst, q):
     """Run transcription in a separate process so it can be cancelled."""
     try:
+        _tune_cpu()
         sys.argv = ["transkun", src, dst, "--device", "cpu"]
         from transkun import transcribe
         try:
-            transcribe.main()
+            import torch
+            with torch.inference_mode():
+                transcribe.main()
         except SystemExit as e:
             if e.code not in (None, 0):
                 raise RuntimeError(f"Transkun exited with code {e.code}")
@@ -78,8 +137,50 @@ class App(ctk.CTk):
         self.proc = None
         self.q = None
         self.folder = None
+        self.last_mid = None
 
         self._build()
+
+        # Intro splash: hide the main window, show splash, then reveal the app
+        self.withdraw()
+        self._show_intro()
+
+    def _show_intro(self):
+        splash = ctk.CTkToplevel(self)
+        splash.overrideredirect(True)
+        splash.configure(fg_color=BG)
+        w, h = 360, 300
+        x = (splash.winfo_screenwidth() - w) // 2
+        y = (splash.winfo_screenheight() - h) // 2
+        splash.geometry(f"{w}x{h}+{x}+{y}")
+        splash.attributes("-topmost", True)
+
+        frame = ctk.CTkFrame(splash, fg_color=BG)
+        frame.pack(expand=True, fill="both", padx=20, pady=20)
+
+        logo_path = resource_path("assets/logo.png")
+        if os.path.exists(logo_path):
+            # keep a reference so the image is not garbage-collected
+            splash._logo = ctk.CTkImage(Image.open(logo_path), size=(96, 96))
+            ctk.CTkLabel(frame, image=splash._logo, text="").pack(pady=(20, 8))
+
+        ctk.CTkLabel(frame, text="tetomidi", text_color=TEXT,
+                     font=ctk.CTkFont(size=26, weight="bold")).pack()
+        ctk.CTkLabel(frame, text="Audio → MIDI", text_color=MUTED,
+                     font=ctk.CTkFont(size=13)).pack(pady=(2, 14))
+        ctk.CTkLabel(frame, text="Loading…", text_color=MUTED,
+                     font=ctk.CTkFont(size=11)).pack()
+
+        splash.after(2200, lambda: self._finish_intro(splash))
+
+    def _finish_intro(self, splash):
+        try:
+            splash.destroy()
+        except Exception:
+            pass
+        self.deiconify()
+        self.lift()
+        self.focus_force()
 
     def _build(self):
         wrap = ctk.CTkFrame(self, fg_color=BG)
@@ -92,22 +193,16 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(wrap, text="tetomidi", text_color=TEXT,
                      font=ctk.CTkFont(size=26, weight="bold")).pack()
-        ctk.CTkLabel(wrap, text="MP3 → MIDI", text_color=MUTED,
+        ctk.CTkLabel(wrap, text="Audio → MIDI", text_color=MUTED,
                      font=ctk.CTkFont(size=13)).pack(pady=(0, 22))
 
         # File picker
-        GlassButton(wrap, "Select MP3 file", W, 48, command=self.pick_file,
+        GlassButton(wrap, "Select audio / video file", W, 48, command=self.pick_file,
                     font=ctk.CTkFont(size=14)).pack()
         self.file_lbl = ctk.CTkLabel(
             wrap, text="No file selected", text_color=MUTED,
             font=ctk.CTkFont(size=12), wraplength=380)
         self.file_lbl.pack(pady=(8, 16))
-
-        # Model
-        ctk.CTkLabel(wrap, text="Model", text_color=MUTED, anchor="w",
-                     font=ctk.CTkFont(size=12)).pack(fill="x")
-        GlassButton(wrap, "Transkun V2", W, 44, interactive=False,
-                    font=ctk.CTkFont(size=13)).pack(pady=(4, 14))
 
         # Device
         ctk.CTkLabel(wrap, text="Device", text_color=MUTED, anchor="w",
@@ -141,15 +236,61 @@ class App(ctk.CTk):
             wrap, mode="indeterminate", height=4,
             fg_color="#151515", progress_color=TEXT)
 
-        self.open_btn = GlassButton(
-            wrap, "Open midi folder", W, 46,
-            command=lambda: os.startfile(self.folder),
-            font=ctk.CTkFont(size=14))
+        # Shown after a finished transcription, inside the same row
+        folder_img = ctk.CTkImage(light_image=_folder_icon(), dark_image=_folder_icon(),
+                                  size=(28, 28))
+        self.folder_btn = ctk.CTkButton(
+            self.row, text="", image=folder_img, width=56, height=56,
+            corner_radius=28, fg_color="#151515", hover_color="#262626",
+            command=self.open_result)
+        self.back_btn = GlassButton(
+            self.row, "Quay lại", W - 66, 56, command=self.reset,
+            boost=1.7, font=ctk.CTkFont(size=16, weight="bold"))
+
+        # Footer: guide + Discord icons (Discord link is hidden behind the icon)
+        footer = ctk.CTkFrame(wrap, fg_color=BG)
+        footer.pack(side="bottom", pady=(14, 0))
+        ctk.CTkButton(
+            footer, text="?", width=40, height=40, corner_radius=20,
+            fg_color="#151515", hover_color="#262626", text_color=TEXT,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            command=self.show_guide).pack(side="left", padx=8)
+        discord_path = resource_path("assets/discord.png")
+        if os.path.exists(discord_path):
+            discord_pil = Image.open(discord_path).convert("RGBA")
+        else:
+            discord_pil = _discord_icon()
+        discord_img = ctk.CTkImage(light_image=discord_pil,
+                                   dark_image=discord_pil, size=(30, 30))
+        ctk.CTkButton(
+            footer, text="", image=discord_img, width=40, height=40,
+            corner_radius=20, fg_color="#151515", hover_color="#262626",
+            command=lambda: webbrowser.open(DISCORD_URL)).pack(side="left", padx=8)
+
+    def show_guide(self):
+        if getattr(self, "_guide", None) and self._guide.winfo_exists():
+            self._guide.lift()
+            return
+        g = ctk.CTkToplevel(self)
+        g.title("Hướng dẫn sử dụng")
+        g.geometry("400x400")
+        g.resizable(False, False)
+        g.configure(fg_color=BG)
+        g.transient(self)
+        self._guide = g
+        ctk.CTkLabel(g, text=GUIDE_TEXT, text_color=TEXT, justify="left",
+                     anchor="w", wraplength=350,
+                     font=ctk.CTkFont(size=13)).pack(
+            fill="both", expand=True, padx=24, pady=(24, 12))
+        ctk.CTkButton(g, text="Đóng", width=140, height=36, fg_color="#151515",
+                      hover_color="#262626", command=g.destroy).pack(pady=(0, 20))
 
     # ---------- actions ----------
     def pick_file(self):
         p = filedialog.askopenfilename(
-            filetypes=[("Audio", "*.mp3 *.wav *.flac *.m4a *.ogg")])
+            filetypes=[("Audio / Video",
+                        "*.mp3 *.mp4 *.m4a *.wav *.flac *.ogg *.aac *.mkv *.webm"),
+                       ("All files", "*.*")])
         if p:
             self.src = p
             self.file_lbl.configure(text=os.path.basename(p), text_color=TEXT)
@@ -161,8 +302,6 @@ class App(ctk.CTk):
             return
         name = os.path.splitext(os.path.basename(self.src))[0] + ".mid"
         dst = os.path.join(output_dir(), name)
-        self.open_btn.pack_forget()
-
         self.q = mp.Queue()
         self.proc = mp.Process(target=_worker,
                                args=(self.src, dst, self.q), daemon=True)
@@ -189,7 +328,7 @@ class App(ctk.CTk):
             return
         if kind == "done":
             self.finish(f"Done: {os.path.basename(msg)}",
-                        os.path.dirname(msg))
+                        os.path.dirname(msg), msg)
         else:
             self.finish("Error:\n" + msg[-400:])
 
@@ -198,17 +337,39 @@ class App(ctk.CTk):
             self.proc.terminate()
         self.finish("Cancelled.")
 
-    def finish(self, text, folder=None):
+    def finish(self, text, folder=None, mid=None):
         self.proc = None
         self.bar.stop()
         self.bar.pack_forget()
         self.busy_btn.pack_forget()
         self.cancel_btn.pack_forget()
-        self.go_btn.pack()
         self.status.configure(text=text)
-        if folder:
+        if mid:
+            # Finished: show folder icon (left) and back button (right)
             self.folder = folder
-            self.open_btn.pack(pady=(12, 0))
+            self.last_mid = mid
+            self.go_btn.pack_forget()
+            self.folder_btn.pack(side="left")
+            self.back_btn.pack(side="left", padx=(10, 0))
+        else:
+            self.go_btn.pack()
+
+    def open_result(self):
+        """Open Explorer in the midi folder with the converted file selected."""
+        if self.last_mid and os.path.exists(self.last_mid):
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(self.last_mid)])
+        elif self.folder:
+            os.startfile(self.folder)
+
+    def reset(self):
+        """Go back to the start state so a new file can be converted."""
+        self.src = None
+        self.last_mid = None
+        self.file_lbl.configure(text="No file selected", text_color=MUTED)
+        self.status.configure(text="")
+        self.folder_btn.pack_forget()
+        self.back_btn.pack_forget()
+        self.go_btn.pack()
 
 
 if __name__ == "__main__":
