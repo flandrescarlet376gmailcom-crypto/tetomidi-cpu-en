@@ -13,6 +13,8 @@ if os.path.exists("assets/logo.png"):
     datas += [("assets/logo.png", "assets")]
 if os.path.exists("assets/tetomidi.ico"):
     datas += [("assets/tetomidi.ico", "assets")]
+if os.path.exists("assets/discord.png"):
+    datas += [("assets/discord.png", "assets")]
 icon = "assets/tetomidi.ico" if os.path.exists("assets/tetomidi.ico") else None
 
 a = Analysis(["main.py"], binaries=binaries, datas=datas, hiddenimports=hidden)
