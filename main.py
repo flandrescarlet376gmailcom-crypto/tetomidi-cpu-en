@@ -77,7 +77,7 @@ BG = "#000000"
 TEXT = "#ffffff"
 MUTED = "#8a8a8a"
 W = 404  # content width
-DISCORD_URL = "https://discord.gg/dbxUt4kBZ"
+DISCORD_URL = "https://discord.gg/peaqm6uqgB"
 # "auto" = use all physical CPU cores, or set a number such as 4
 THREADS = "auto"
 
