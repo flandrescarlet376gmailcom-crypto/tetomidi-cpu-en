@@ -1,3 +1,4 @@
 transkun
 pillow
 customtkinter
+psutil
