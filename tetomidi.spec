@@ -1,20 +1,12 @@
 import os
 from PyInstaller.utils.hooks import collect_all
 
-datas, binaries, hidden = [], [], []
-for pkg in ["transkun", "customtkinter"]:
-    d, b, h = collect_all(pkg)
-    datas += d
-    binaries += b
-    hidden += h
+Thin client: only the GUI is bundled (no Transkun, no ffmpeg, no yt-dlp)
+datas, binaries, hidden = collect_all("customtkinter")
 
-binaries += [(f"bin/{exe}", "bin") for exe in ("ffmpeg.exe", "ffprobe.exe")]
-if os.path.exists("assets/logo.png"):
-    datas += [("assets/logo.png", "assets")]
-if os.path.exists("assets/tetomidi.ico"):
-    datas += [("assets/tetomidi.ico", "assets")]
-if os.path.exists("assets/discord.png"):
-    datas += [("assets/discord.png", "assets")]
+for asset in ["assets/logo.png", "assets/tetomidi.ico", "assets/discord.png"]:
+    if os.path.exists(asset):
+        datas += [(asset, "assets")]
 icon = "assets/tetomidi.ico" if os.path.exists("assets/tetomidi.ico") else None
 
 a = Analysis(["main.py"], binaries=binaries, datas=datas, hiddenimports=hidden)
