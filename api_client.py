@@ -6,6 +6,7 @@ import base64
 import json
 import os
 import re
+import ssl
 import threading
 import urllib.error
 import urllib.parse
@@ -15,6 +16,18 @@ import uuid
 
 class ApiError(Exception):
     pass
+
+
+def _ssl_context():
+    """Use certifi's CA bundle so HTTPS works inside the packaged .exe."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+_SSL = _ssl_context()
 
 
 class ApiClient:
@@ -28,7 +41,7 @@ class ApiClient:
         h.update(headers or {})
         req = urllib.request.Request(self.base + path, data=body, method=method, headers=h)
         try:
-            with urllib.request.urlopen(req, timeout=timeout or self.timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout or self.timeout, context=_SSL) as r:
                 return r.read()
         except urllib.error.HTTPError as e:
             try:
@@ -106,7 +119,7 @@ class BridgeClient:
     def _request(self, method, url, body=None, headers=None):
         req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=_SSL) as r:
                 return r.headers.get("Content-Type", ""), r.headers.get("Content-Disposition", ""), r.read()
         except urllib.error.HTTPError as e:
             detail = e.read()[:300].decode("utf-8", "replace")
