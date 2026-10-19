@@ -7,7 +7,7 @@ AppId={{B7C3E9A2-5D41-4E7B-9F26-3A1C8D5E7F10}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=tetomidi
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={autopf}{#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -23,12 +23,13 @@ WizardStyle=modern
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "dist\tetomidi\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion createallsubdirs
+Source: "dist\tetomidi*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion createallsubdirs
 Source: "assets\tetomidi.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "tetomidi.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
 [Icons]
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; IconFilename: "{app}\tetomidi.ico"
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; IconFilename: "{app}\tetomidi.ico"
+Name: "{autodesktop}{#MyAppName}"; Filename: "{app}{#MyAppExe}"; IconFilename: "{app}\tetomidi.ico"
+Name: "{autoprograms}{#MyAppName}"; Filename: "{app}{#MyAppExe}"; IconFilename: "{app}\tetomidi.ico"
 
 [Run]
-Filename: "{app}\{#MyAppExe}"; Description: "Mở tetomidi"; Flags: nowait postinstall skipifsilent
+Filename: "{app}{#MyAppExe}"; Description: "Mở tetomidi"; Flags: nowait postinstall skipifsilent
