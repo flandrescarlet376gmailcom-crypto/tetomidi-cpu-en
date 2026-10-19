@@ -3,10 +3,9 @@ pycache/
 dist/
 build/
 installer/
-bin/ffmpeg.exe
-bin/ffprobe.exe
 assets/tetomidi.ico
-ff/
+tetomidi.log
+midi/
 *.zip
 *.mid
 *.mp3
