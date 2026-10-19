@@ -86,6 +86,15 @@ class ApiClient:
         return json.loads(self._open("DELETE", f"/api/jobs/{job_id}").decode("utf-8"))
 
 
+def _name_from_url(url):
+    """Use the last part of the link as the name, e.g. .../artist/track-name -> track-name."""
+    p = urllib.parse.urlparse(url)
+    parts = [x for x in p.path.split("/") if x]
+    base = urllib.parse.unquote(parts[-1]) if parts else p.netloc
+    base = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", base).strip(" ._")
+    return (base or "link")[:100]
+
+
 class BridgeClient:
     """
     Talks to an existing transcription endpoint that accepts a file or a link
@@ -158,8 +167,8 @@ class BridgeClient:
             midi = data
         if midi[:4] != b"MThd":
             raise ApiError("Response is not a MIDI file. First bytes: " + repr(midi[:60]))
-        m = re.search(r'filename="?([^";]+)"?', disp or "")
-        name = os.path.basename(m.group(1)) if m else fallback_name
+        # The server's own name (often "transcription.mid") is ignored on purpose.
+        name = fallback_name
         if not name.lower().endswith(".mid"):
             name = os.path.splitext(name)[0] + ".mid"
         return midi, name
@@ -193,7 +202,8 @@ class BridgeClient:
         with self.lock:
             self.jobs[jid] = {"state": "running", "midi": None, "name": "", "error": ""}
         threading.Thread(target=self._run,
-                         args=(jid, lambda: self._send_link(self.link_path, url), "link.mid"),
+                         args=(jid, lambda: self._send_link(self.link_path, url),
+                               _name_from_url(url) + ".mid"),
                          daemon=True).start()
         return jid
 
