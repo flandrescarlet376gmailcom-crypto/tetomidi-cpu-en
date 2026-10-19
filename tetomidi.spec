@@ -3,6 +3,11 @@ from PyInstaller.utils.hooks import collect_all
 
 # Thin client: only the GUI is bundled (no Transkun, no ffmpeg, no yt-dlp)
 datas, binaries, hidden = collect_all("customtkinter")
+# certifi provides the CA bundle used for HTTPS requests
+cert_datas, cert_bins, cert_hidden = collect_all("certifi")
+datas += cert_datas
+binaries += cert_bins
+hidden += cert_hidden
 
 for asset in ["assets/logo.png", "assets/tetomidi.ico", "assets/discord.png"]:
     if os.path.exists(asset):
