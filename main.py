@@ -148,7 +148,7 @@ class App(ctk.CTk):
         self.title("tetomidi")
         self.geometry("460x800")
         self.resizable(False, False)
-        self.configure(fg_color=BG)
+        self.configure(fg_color=BG, background=BG)
 
         ico = resource_path("assets/tetomidi.ico")
         if os.path.exists(ico):
@@ -277,12 +277,16 @@ class App(ctk.CTk):
         self.after(100, check)
 
     def _check_server(self):
-        host = self.cfg["server"]
         self.server_lbl.configure(text="Server: checking")
-        self._bg(lambda: self.api.health(),
-                 lambda _: self.server_lbl.configure(text=f"Server: online  {host}", text_color=TEXT),
-                 lambda m: self.server_lbl.configure(
-                     text=f"Server offline. Check tetomidi.json ({m[:60]})", text_color=MUTED))
+
+        def ok(_):
+            self.server_lbl.configure(text="Server: online", text_color=TEXT)
+
+        def err(msg):
+            self.server_lbl.configure(text="Server offline", text_color=MUTED)
+            self._ui_log("Server check failed: " + msg)
+
+        self._bg(lambda: self.api.health(), ok, err)
 
     # ---------- layout ----------
     def _build(self):
@@ -291,7 +295,7 @@ class App(ctk.CTk):
 
         # Footer first, so it always keeps its space at the bottom
         footer = ctk.CTkFrame(wrap, fg_color=BG)
-        footer.pack(side="bottom", pady=(14, 0))
+        footer.pack(side="top", pady=(0, 10))
         folder_small = ctk.CTkImage(light_image=_folder_icon(), dark_image=_folder_icon(),
                                     size=(24, 24))
         ctk.CTkButton(footer, text="", image=folder_small, width=40, height=40,
