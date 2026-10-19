@@ -1,7 +1,7 @@
 import os
 from PyInstaller.utils.hooks import collect_all
 
-Thin client: only the GUI is bundled (no Transkun, no ffmpeg, no yt-dlp)
+# Thin client: only the GUI is bundled (no Transkun, no ffmpeg, no yt-dlp)
 datas, binaries, hidden = collect_all("customtkinter")
 
 for asset in ["assets/logo.png", "assets/tetomidi.ico", "assets/discord.png"]:
