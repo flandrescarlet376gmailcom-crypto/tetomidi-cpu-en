@@ -10,44 +10,37 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      
-uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      
-uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-      
-name: Install dependencies
-      shell: pwsh
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt pyinstaller
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
 
-      
-name: Make icon
-      shell: pwsh
-      run: python make_icon.py
+      - name: Make icon
+        shell: pwsh
+        run: python make_icon.py
 
-      
-name: Build exe
-      shell: pwsh
-      run: pyinstaller tetomidi.spec --noconfirm
+      - name: Build exe
+        shell: pwsh
+        run: pyinstaller tetomidi.spec --noconfirm
 
-      
-name: Install Inno Setup
-      shell: pwsh
-      run: choco install innosetup -y --no-progress
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
 
-      
-name: Build installer
-      shell: pwsh
-      run: |& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" tetomidi.iss
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" tetomidi.iss
 
-      
-uses: actions/upload-artifact@v4
-      with:
-        name: tetomidi-setup
-        path: installer/tetomidi-setup.exe
-        compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tetomidi-setup
+          path: installer/tetomidi-setup.exe
+          compression-level: 0
